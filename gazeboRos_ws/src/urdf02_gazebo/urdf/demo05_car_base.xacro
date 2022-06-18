@@ -1,0 +1,181 @@
+<robot name="my_base" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:property name="footprint_radius" value="0.001" />
+    <!-- 底盘属性 -->
+    <xacro:property name="base_link_radius" value="1" /> <!-- base_link 半径 -->
+    <xacro:property name="base_link_length" value="0.8" /> <!-- base_link 长 -->
+    <xacro:property name="lidi" value="0.15" /> <!-- 离地间距 -->
+    <!-- 2kg -->
+    <xacro:property name="base_link_mass" value="20" />
+
+
+    <!-- 1.base_footprint -->
+    <link name="base_footprint">
+
+
+        <visual>
+        <geometry>
+            <sphere radius="${footprint_radius}" />
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        </visual>
+    </link>
+
+    <!-- 2.base_link -->
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <cylinder radius="${base_link_radius}" length="${base_link_length}" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <material name="yellow">
+                <color rgba="0.5 0.3 0.0 0.5" />
+            </material>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder radius="${base_link_radius}" length="${base_link_length}" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+        </collision>
+
+        <!-- 调用惯性矩阵函数 -->
+        <xacro:include filename="head.xacro" />
+        <!-- m="" r="" h="" 传参 -->
+        <xacro:cylinder_inertial_matrix m="${base_link_mass}" r="${base_link_radius}" h="${base_link_length}"/>
+    </link>
+    <gazebo reference="base_link">
+        <material>Gazebo/Yellow</material>
+
+    </gazebo>
+
+    <joint name="base_link2base_footprint" type="fixed">
+        <parent link="base_footprint" />
+        <child link="base_link" />
+        <origin xyz="0 0 ${lidi + base_link_length / 2 }" />
+    </joint>
+
+    <!-- 3.添加驱动轮 -->
+    <!-- 
+        形状：圆柱
+        半径：0.035m
+        长度：0.015m
+    
+     -->
+
+    <!-- 属性 -->
+    <xacro:property name="wheel_radius" value="0.325" />
+    <xacro:property name="wheel_length" value="0.15" />
+    <xacro:property name="PI" value="3.1415926" />
+    <xacro:property name="wheel_mass" value="0.5" />
+    <!-- 注意：结果是负数 -->
+    <xacro:property name="wheel_joint_z" value="${-1*(base_link_length/2+lidi - wheel_radius)}" />
+    <!-- 
+        wheel_name: left or right
+        flag: 1 or -1
+
+     -->
+
+    <!-- 宏的定义 不调用不生效 -->
+    <xacro:macro name="wheel_func" params="wheel_name flag">
+        <!-- 3.1.link -->
+        <link name="${wheel_name}_wheel">
+            <visual>
+            <geometry>
+                <cylinder radius="${wheel_radius}" length="${wheel_length}" />
+            </geometry>
+            <origin xyz="0.0 0.0 0.0" rpy="${PI / 2} 0.0 0.0" />
+            <material name="black">
+                <color rgba="0 0 0 0.5" />
+            </material>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_length}" />
+                </geometry>
+                <origin xyz="0.0 0.0 0.0" rpy="${PI / 2} 0.0 0.0" />
+            </collision>
+            <!-- 调用惯性矩阵函数 -->
+            <xacro:include filename="head.xacro" />
+            <!-- m="" r="" h="" 传参 -->
+            <xacro:cylinder_inertial_matrix m="${wheel_mass}" r="${wheel_radius}" h="${wheel_length}"/>
+        </link>
+
+        <gazebo reference="${wheel_name}_wheel">
+            <material>Gazebo/Red</material>
+        </gazebo>
+
+            <!-- 3.2.joint -->
+        <joint name="${wheel_name}2link" type="continuous">
+            <parent link="base_link" />
+            <child link="${wheel_name}_wheel" />
+            <!-- 
+                x 无偏移
+                y 车体半径
+                z z=-(车体高度/2 + 离地间距 - 车轮半径)
+
+            -->
+            <origin xyz="0 ${flag * base_link_radius} ${wheel_joint_z }" />
+            <axis xyz="0 1 0" />
+        </joint>
+
+    </xacro:macro>
+
+    <!-- 宏的调用 -->
+    <xacro:wheel_func wheel_name="left" flag="1" />
+    <xacro:wheel_func wheel_name="right" flag="-1" />
+
+
+    <!-- 4.添加支撑轮 -->
+    <!-- 
+        形状:球
+        半径：0.0075m
+     -->
+    <!-- 支撑轮属性 -->
+    <xacro:property name="support_wheel_radius" value="0.075" /> <!-- 支撑轮半径 -->
+    <!-- z的偏移量 = 车体高度/2 + 离地间距 - 支持轮半径 -->
+    <xacro:property name="support_joint_z" value="${-(base_link_length/2+lidi-support_wheel_radius)}" /> 
+    <xacro:property name="support_wheel_mass" value="0.1" /> 
+
+    <!-- 支撑轮宏 -->
+    <xacro:macro name="add_support_wheel" params="support_name flag" >
+        <link name="${support_name}_wheel">
+            <visual>
+                <geometry>
+                    <sphere radius="${support_wheel_radius}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <material name="black">
+                    <color rgba="0 0 0 0.5" />
+                </material>
+            </visual>
+
+            <collision>
+                <geometry>
+                    <sphere radius="${support_wheel_radius}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+            </collision>
+            <!-- 调用惯性矩阵函数 -->
+            <xacro:include filename="head.xacro" />
+            <!-- m="" r="" 传参 -->
+            <xacro:sphere_inertial_matrix m="${support_wheel_mass}" r="${support_wheel_radius}"/>
+        </link>
+        <!-- 在 <link>标签中找name-->
+        <gazebo reference="${support_name}_wheel">  
+            <material>Gazebo/Red</material>
+        </gazebo>
+
+        <joint name="${support_name}_wheel2link" type="continuous">
+            <parent link="base_link" />
+            <child link="${support_name}_wheel" />
+            <origin xyz="${flag * (base_link_radius - support_wheel_radius)} 0 ${support_joint_z}" />
+            <axis xyz="1 1 1" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:add_support_wheel support_name="front" flag="1" />
+    <xacro:add_support_wheel support_name="back" flag="-1" />
+
+
+</robot>
